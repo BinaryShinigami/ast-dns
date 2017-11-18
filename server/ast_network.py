@@ -9,7 +9,7 @@ class ClientHandler(socketserver.BaseRequestHandler):
 	
 	def handle(self):
 		#Handle client connection here
-		pass
+		print("Client Connected from {0}".format(self.client_address[0]))
 	
 
 def start_server(host, port):

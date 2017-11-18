@@ -13,3 +13,7 @@ if len(sys.argv) < 3:
 	print_usage()
 	exit()
 	
+# Check to make sure parameters are good
+
+server = ast_network.start_server('', int(sys.argv[2]))
+server.serve_forever()
