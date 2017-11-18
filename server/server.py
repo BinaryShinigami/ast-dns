@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import sys
+import threading
 import ast_db
 import ast_network
 
@@ -15,5 +16,13 @@ if len(sys.argv) < 3:
 	
 # Check to make sure parameters are good
 
+
+# MAIN CODE BELOW ##################################
+
 server = ast_network.start_server('', int(sys.argv[2]))
+
+#Setup shared properties
+server.ast_db_lock = threading.Lock()
+server.ast_db = 0
+
 server.serve_forever()
