@@ -2,7 +2,7 @@
 
 import sqlite3	
 	
-def open_db(con, db_file):
+def open_db(db_file):
 	# Opens the database file
 	con = sqlite3.connect(db_file)
 	return con
@@ -32,3 +32,14 @@ def map_host(con, hostname, ip):
 		return TRUE
 	else:
 		return FALSE
+
+def load_hosts(con):
+	# Loads all the existing hosts in the table
+	q = "SELECT hostname, ip FROM mappings"
+	results = con.execute(q)
+	results = results.fetchall()
+	ret = {}
+	if len(results) > 0:
+		for host in results:
+			ret[host[0]] = host[1]
+	return ret

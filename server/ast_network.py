@@ -1,6 +1,7 @@
 # Network functions for AST_DNS Server
 
 import socketserver
+import socket
 import threading
 import select
 import ast_db
@@ -21,6 +22,13 @@ class ClientHandler(socketserver.BaseRequestHandler):
 			try:
 				
 				events = poller.poll(0)
+				
+				# If any updates, send them to the client
+				if self.server.send_updates:
+					print("Updates Ready to Send!\r\nSending data: {0}\r\n".format(self.make_host_string(self.server.host_table)))
+					self.server.ast_db_lock.acquire()
+					self.server.send_updates = 0
+					self.server.ast_db_lock.release()
 			
 				for sock, evt_type in events:
 					if evt_type & select.EPOLLIN:
@@ -30,11 +38,14 @@ class ClientHandler(socketserver.BaseRequestHandler):
 							print("New hostname reported from: {0}, new hostname is {1}\r\n".format(self.client_address[0], data.strip()))
 							
 							# Lock the database output here and write to the db file
-							#self.server.ast_db_lock.aquire() #blocks until aquired
-							#try:
-							#	ast_db.map_host(self.server.ast_db, hostname, self.client_address[0])
-							#finally:
-							#	self.server.ast_db_lock.release()
+							#print("Attempting to acquire DB map_host Lock on {0}\r\n".format(self.server.ast_db_lock))
+							self.server.ast_db_lock.acquire() #blocks until acquired
+							try:
+								ast_db.map_host(self.server.ast_db, data.strip(), self.client_address[0])
+								self.server.host_table[hostname] = self.client_address[0]
+								self.server.send_updates = 1
+							finally:
+								self.server.ast_db_lock.release()
 						else:
 							print("Client host {0} closed connection!\r\n".format(self.client_address[0]))
 							self.request.shutdown(socket.SHUT_RDWR)
@@ -53,11 +64,17 @@ class ClientHandler(socketserver.BaseRequestHandler):
 						self.request.close()
 						break;
 				
-			except:
-				print("Exception occurred! Closing connection from {0}\r\n".format(self.client_address[0]))
+			except Exception as e:
+				print("Exception occurred! Closing connection from {0}\r\n{1}\r\n".format(self.client_address[0], e))
 				self.request.shutdown(socket.SHUT_RDWR)
 				self.request.close()
 				break;
+	
+	def make_host_string(hosts):
+		output = "{0}:".format(len(hosts))
+		for host in hosts:
+			output = "{0}{1}={2}".format(output, host, hosts[host])
+		return output
 			
 class ASTSocketServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 	pass

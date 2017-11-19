@@ -2,6 +2,7 @@
 
 import sys
 import threading
+import os.path
 import ast_db
 import ast_network
 
@@ -15,15 +16,34 @@ if len(sys.argv) < 3:
 	exit()
 	
 # Check to make sure parameters are good
-
+if not sys.argv[2].isdigit():
+	print_usage()
+	exit()
 
 # MAIN CODE BELOW ##################################
 
-server = ast_network.start_server('', int(sys.argv[2]))
+try:
+	if os.path.isfile(sys.argv[1]):
+		db_init = 0
+	else:
+		db_init = 1
+	
+	db = ast_db.open_db(sys.argv[1])
+	if db_init:
+		ast_db.init_db(db)
+		hosts = {}
+	else:
+		hosts = ast_db.load_hosts(db)
 
-#Setup shared properties
-server.ast_db_lock = threading.Lock()
-server.ast_db = 0
-server.running = 1
+	server = ast_network.start_server('', int(sys.argv[2]))
 
-server.serve_forever()
+	#Setup shared properties
+	server.ast_db_lock = threading.Lock()
+	server.ast_db = db
+	server.running = 1
+	server.send_updates = 0
+	server.host_table = hosts
+
+	server.serve_forever()
+except Exception as e:
+	print("An exception occurred!\r\n{0}\r\n Closing Server!".format(e))
