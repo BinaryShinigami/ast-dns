@@ -9,6 +9,8 @@ import ast_db
 class ClientHandler(socketserver.BaseRequestHandler):
 	# This class handles the actual client connections once connected
 	
+	cur_hostname = ""
+	
 	def handle(self):
 		# Handles individual Client connections and threads
 		print("New Client Connected from {0}".format(self.client_address[0]))
@@ -35,14 +37,18 @@ class ClientHandler(socketserver.BaseRequestHandler):
 						data = self.request.recv(1024)
 						
 						if len(data) >= 1:
-							print("New hostname reported from: {0}, new hostname is {1}\r\n".format(self.client_address[0], data.strip()))
+							data = data.strip().decode('utf-8')
+							print("New hostname reported from: {0}, new hostname is {1}\r\n".format(self.client_address[0], data))
 							
 							# Lock the database output here and write to the db file
 							#print("Attempting to acquire DB map_host Lock on {0}\r\n".format(self.server.ast_db_lock))
 							self.server.ast_db_lock.acquire() #blocks until acquired
 							try:
-								ast_db.map_host(self.server.ast_db, data.strip(), self.client_address[0])
-								self.server.host_table[hostname] = self.client_address[0]
+								#ast_db.map_host(self.server.ast_db, data.strip(), self.client_address[0])
+								if len(self.cur_hostname) > 0:
+									del self.server.host_table[self.cur_hostname];
+								self.server.host_table[data] = self.client_address[0]
+								self.cur_hostname = data
 								self.server.send_updates = 1
 							finally:
 								self.server.ast_db_lock.release()
@@ -70,10 +76,10 @@ class ClientHandler(socketserver.BaseRequestHandler):
 				self.request.close()
 				break;
 	
-	def make_host_string(hosts):
+	def make_host_string(self, hosts):
 		output = "{0}:".format(len(hosts))
 		for host in hosts:
-			output = "{0}{1}={2}".format(output, host, hosts[host])
+			output = "{0}{1}={2}--".format(output, host, hosts[host])
 		return output
 			
 class ASTSocketServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
