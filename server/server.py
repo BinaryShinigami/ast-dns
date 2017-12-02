@@ -43,6 +43,7 @@ try:
 	server.running = 1
 	server.send_updates = 0
 	server.host_table = hosts
+	server.client_sockets = []
 
 	server.serve_forever()
 except Exception as e:

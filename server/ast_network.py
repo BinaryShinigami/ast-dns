@@ -10,16 +10,20 @@ class ClientHandler(socketserver.BaseRequestHandler):
 	# This class handles the actual client connections once connected
 	
 	cur_hostname = ""
+	sock = -1
 	
 	def handle(self):
 		# Handles individual Client connections and threads
 		print("New Client Connected from {0}".format(self.client_address[0]))
+		self.server.client_sockets.append(self.request.fileno());
+		self.sock = self.request.fileno();
 		
 		while self.server.running:
 			# Handle reading from individual clients
 			
 			poller = select.epoll()
-			poller.register(self.request.fileno(), select.EPOLLIN)
+			if self.request.fileno() != -1:
+				poller.register(self.request.fileno(), select.EPOLLIN)
 			
 			try:
 				
@@ -29,6 +33,8 @@ class ClientHandler(socketserver.BaseRequestHandler):
 				if self.server.send_updates:
 					print("Updates Ready to Send!\r\nSending data: {0}\r\n".format(self.make_host_string(self.server.host_table)))
 					self.server.ast_db_lock.acquire()
+					#loop through self.server.client_sockets and send the updates to everyone!
+					self.request.send(bytes(self.make_host_string(self.server.host_table), 'utf-8'))
 					self.server.send_updates = 0
 					self.server.ast_db_lock.release()
 			
@@ -54,24 +60,28 @@ class ClientHandler(socketserver.BaseRequestHandler):
 								self.server.ast_db_lock.release()
 						else:
 							print("Client host {0} closed connection!\r\n".format(self.client_address[0]))
+							self.server.client_sockets.remove(self.sock)
 							self.request.shutdown(socket.SHUT_RDWR)
 							self.request.close()
 							break;
 							
 					elif evt_type & select.EPOLLHUP:
 						print("Client host {0} closed connection!\r\n".format(self.client_address[0]))
+						self.server.client_sockets.remove(self.sock)
 						self.request.shutdown(socket.SHUT_RDWR)
 						self.request.close()
 						break;
 						
 					elif evt_type & select.EPOLLERR:
 						print("Client host {0} closed connection!\r\n".format(self.client_address[0]))
+						self.server.client_sockets.remove(self.sock)
 						self.request.shutdown(socket.SHUT_RDWR)
 						self.request.close()
 						break;
 				
 			except Exception as e:
 				print("Exception occurred! Closing connection from {0}\r\n{1}\r\n".format(self.client_address[0], e))
+				self.server.client_sockets.remove(self.sock)
 				self.request.shutdown(socket.SHUT_RDWR)
 				self.request.close()
 				break;
